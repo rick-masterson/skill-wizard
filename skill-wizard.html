@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Skill Wizard</title>
+<style>
+  :root{
+    --bg: #0E2136;
+    --bg-panel: #14304A;
+    --bg-panel-2: #1B3D5C;
+    --line: #23415E;
+    --ink: #ECEFF3;
+    --ink-dim: #9FB2C6;
+    --accent: #F2A64B;
+    --accent-ink: #241505;
+    --accent-dim: #C6842F;
+    --trace: #4CA69B;
+    --paper: #F3EEDF;
+    --paper-ink: #241C12;
+    --paper-dim: #8B8069;
+    --danger: #E2685A;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html,body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    min-height:100vh;
+  }
+
+  body{
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
+  }
+
+  .wrap{ max-width: 980px; margin: 0 auto; padding: 32px 20px 60px; }
+
+  /* ---------- header ---------- */
+  .head{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    gap:16px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .head h1{
+    font-family: var(--font-mono); font-size: 26px; font-weight: 700;
+    letter-spacing: 0.2px; margin: 0 0 6px 0; color: var(--ink);
+  }
+  .head p{ margin:0; color: var(--ink-dim); font-size: 14px; max-width: 52ch; line-height: 1.5; }
+
+  .start-over{
+    background:none; border:1px solid var(--line); color: var(--ink-dim);
+    font-family: var(--font-mono); font-size: 12px; padding: 7px 12px;
+    border-radius: 3px; cursor: pointer; white-space: nowrap;
+  }
+  .start-over:hover{ border-color: var(--ink-dim); color: var(--ink); }
+
+  /* ---------- engine ---------- */
+  details.engine{ background: var(--bg-panel); border: 1px solid var(--line); margin-bottom: 16px; }
+  details.engine summary{
+    padding: 10px 14px; font-family: var(--font-mono); font-size: 12.5px;
+    color: var(--ink-dim); cursor: pointer;
+  }
+  details.engine summary b{ color: var(--trace); font-weight: 600; }
+  .engine-body{ padding: 4px 14px 14px; display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .engine-body .span2{ grid-column: 1 / -1; }
+  .engine-note{ color: var(--ink-dim); font-size: 12.5px; line-height: 1.5; margin: 0; }
+
+  /* ---------- board ---------- */
+  .board{ display:grid; grid-template-columns: 176px 1fr; background: var(--bg-panel); border: 1px solid var(--line); }
+
+  .rail{ border-right: 1px solid var(--line); padding: 22px 0; position: relative; }
+
+  .rail-item{
+    display:flex; align-items:center; gap:10px; padding: 14px 18px; cursor: pointer;
+    position: relative; background: none; border: none; width: 100%; text-align: left;
+    color: var(--ink-dim); font-family: var(--font-sans);
+  }
+  .rail-item .dot{
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid var(--line); display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim);
+    background: var(--bg-panel); z-index: 1;
+  }
+  .rail-item:not(:last-child)::after{
+    content:""; position:absolute; left: 28px; top: 42px; width: 1px; height: 26px; background: var(--line);
+  }
+  .rail-item.is-done .dot{ background: var(--trace); border-color: var(--trace); color: #082622; }
+  .rail-item.is-done:not(:last-child)::after{ background: var(--trace); }
+  .rail-item.is-active .dot{ border-color: var(--accent); color: var(--accent); }
+  .rail-item.is-active .label{ color: var(--ink); font-weight: 600; }
+  .rail-item .label{ font-size: 13px; }
+
+  .panel{ padding: 26px 28px 22px; min-height: 360px; display:flex; flex-direction: column; }
+  .step{ display:none; flex: 1; }
+  .step.is-active{ display:block; }
+
+  .step h2{ font-family: var(--font-mono); font-size: 17px; margin: 0 0 6px 0; color: var(--ink); }
+  .step .hint{ color: var(--ink-dim); font-size: 13px; margin: 0 0 18px 0; line-height: 1.55; max-width: 58ch; }
+
+  label.field-label{ display:block; font-size: 12.5px; color: var(--ink-dim); margin-bottom: 6px; font-family: var(--font-mono); }
+
+  input[type=text], input[type=password], select, textarea{
+    width:100%; background: var(--bg-panel-2); border: 1px solid var(--line); color: var(--ink);
+    padding: 10px 12px; font-family: var(--font-sans); font-size: 14px; border-radius: 3px; line-height: 1.5;
+  }
+  textarea{ resize: vertical; }
+  #steps-input, #guards-input{ font-family: var(--font-mono); font-size: 13px; min-height: 190px; }
+
+  input:focus, select:focus, textarea:focus{
+    outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent);
+  }
+
+  .field{ margin-bottom: 18px; }
+  .slug-preview{ font-family: var(--font-mono); font-size: 12.5px; color: var(--trace); margin-top: 5px; }
+
+  /* chips */
+  .trigger-row{ display:flex; gap: 8px; margin-bottom: 12px; }
+  .trigger-row input{ flex:1; }
+  .add-btn{
+    flex: 0 0 auto; background: var(--bg-panel-2); border: 1px solid var(--line); color: var(--ink);
+    padding: 0 16px; font-family: var(--font-mono); font-size: 13px; border-radius: 3px; cursor: pointer;
+  }
+  .add-btn:hover{ border-color: var(--accent); color: var(--accent); }
+  .chips{ display:flex; flex-wrap: wrap; gap: 8px; min-height: 30px; }
+  .chip{
+    display:inline-flex; align-items:center; gap: 8px; background: var(--bg-panel-2);
+    border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px 5px 11px; font-size: 13px; color: var(--ink);
+  }
+  .chip button{ background:none; border:none; color: var(--ink-dim); cursor:pointer; font-size: 14px; line-height:1; padding: 2px 4px; }
+  .chip button:hover{ color: var(--danger); }
+  .empty-note{ color: var(--paper-dim); font-size: 13px; }
+
+  /* nav */
+  .nav-buttons{ display:flex; justify-content: space-between; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+  .btn{
+    font-family: var(--font-mono); font-size: 13px; padding: 9px 18px; border-radius: 3px;
+    cursor: pointer; border: 1px solid var(--line); background: none; color: var(--ink-dim);
+  }
+  .btn:hover{ color: var(--ink); border-color: var(--ink-dim); }
+  .btn:disabled{ opacity: 0.35; cursor: not-allowed; }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn.primary:hover{ background: var(--accent-dim); border-color: var(--accent-dim); color: var(--accent-ink); }
+
+  .ai-row{ display:flex; align-items:center; gap: 12px; margin-top: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+  .btn.ai{ border-color: var(--trace); color: var(--trace); }
+  .btn.ai:hover{ background: var(--trace); color: #082622; border-color: var(--trace); }
+  .btn.ai.is-busy{ animation: ai-pulse 1.1s ease-in-out infinite; }
+  @keyframes ai-pulse{ 0%, 100%{ opacity: 1; } 50%{ opacity: 0.55; } }
+  .ai-status{ font-family: var(--font-mono); font-size: 12px; color: var(--ink-dim); min-height: 16px; }
+
+  /* lint */
+  .lint{ list-style: none; margin: 16px 0 0 0; padding: 0; }
+  .lint li{ display:flex; gap: 10px; font-size: 13px; line-height: 1.5; padding: 5px 0; color: var(--ink); }
+  .lint .mark{ font-family: var(--font-mono); flex: 0 0 14px; }
+  .lint .ok .mark{ color: var(--trace); }
+  .lint .warn .mark{ color: var(--accent); }
+  .lint .bad .mark{ color: var(--danger); }
+
+  /* manifest */
+  .manifest{ margin-top: 20px; }
+  .manifest-head{ display:flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  .manifest-path{ font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-dim); }
+  .manifest-path span{ color: var(--trace); }
+  .manifest-path em{ font-style: normal; margin-left: 12px; color: var(--ink-dim); }
+  .manifest-actions{ display:flex; gap: 8px; flex-wrap: wrap; }
+
+  .manifest-card{ position: relative; background: var(--paper); color: var(--paper-ink); border: 1px solid #d9d0ba; padding: 20px 22px; }
+  .manifest-card::before, .manifest-card::after{
+    content:""; position:absolute; top: 10px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--bg); border: 1px solid #d9d0ba;
+  }
+  .manifest-card::before{ left: 10px; }
+  .manifest-card::after{ right: 10px; }
+
+  #preview{
+    margin: 6px 0 0 0; font-family: var(--font-mono); font-size: 13px; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word; max-height: 380px; overflow-y: auto;
+  }
+  #preview .placeholder{ color: var(--paper-dim); }
+
+  footer.note{ margin-top: 16px; color: var(--ink-dim); font-size: 12px; text-align: center; line-height: 1.55; }
+
+  @media (max-width: 720px){
+    .board{ grid-template-columns: 1fr; }
+    .rail{ display:flex; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--line); padding: 14px 10px; }
+    .rail-item{ padding: 8px 12px; width: auto; flex: 0 0 auto; }
+    .rail-item::after{ display:none; }
+    .panel{ padding: 20px; }
+    .engine-body{ grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition: none !important; animation: none !important; } }
+
+  :focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>Skill Wizard</h1>
+      <p>Build a model-portable SKILL.md: plain Markdown, no platform hooks, readable by any LLM. Model assist runs on whichever engine you pick.</p>
+    </div>
+    <button class="start-over" id="reset-btn" type="button">Start over</button>
+  </div>
+
+  <details class="engine" id="engine">
+    <summary>Engine: <b id="engine-summary">Claude (in-app)</b></summary>
+    <div class="engine-body">
+      <div class="span2">
+        <label class="field-label" for="engine-provider">Model engine</label>
+        <select id="engine-provider">
+          <option value="claude-inapp">Claude, built in (works only inside Claude)</option>
+          <option value="openai">OpenAI-compatible endpoint (OpenAI, Ollama, LM Studio, llama.cpp, DeepSeek, OpenRouter)</option>
+          <option value="anthropic">Anthropic API with your key</option>
+          <option value="off">Off, manual only</option>
+        </select>
+      </div>
+      <div id="engine-base-wrap" class="span2" hidden>
+        <label class="field-label" for="engine-base">Base URL</label>
+        <input type="text" id="engine-base" value="https://api.openai.com/v1" />
+      </div>
+      <div id="engine-model-wrap" hidden>
+        <label class="field-label" for="engine-model">Model id</label>
+        <input type="text" id="engine-model" placeholder="e.g. llama3.1, gpt-4o-mini" />
+      </div>
+      <div id="engine-key-wrap" hidden>
+        <label class="field-label" for="engine-key">API key (blank for local servers)</label>
+        <input type="password" id="engine-key" autocomplete="off" />
+      </div>
+      <p class="engine-note span2" id="engine-note"></p>
+    </div>
+  </details>
+
+  <div class="board">
+    <nav class="rail" id="rail">
+      <button class="rail-item" data-step="1" type="button"><span class="dot">1</span><span class="label">Identify</span></button>
+      <button class="rail-item" data-step="2" type="button"><span class="dot">2</span><span class="label">Triggers</span></button>
+      <button class="rail-item" data-step="3" type="button"><span class="dot">3</span><span class="label">Steps</span></button>
+      <button class="rail-item" data-step="4" type="button"><span class="dot">4</span><span class="label">Guardrails</span></button>
+      <button class="rail-item" data-step="5" type="button"><span class="dot">5</span><span class="label">Assemble</span></button>
+    </nav>
+
+    <main class="panel">
+
+      <section class="step" data-step="1">
+        <h2>Identify the skill</h2>
+        <p class="hint">Name it short and specific. The name becomes the folder and the frontmatter <code>name:</code> field.</p>
+        <div class="field">
+          <label class="field-label" for="name-input">Skill name</label>
+          <input type="text" id="name-input" placeholder="e.g. acoustic duct mapper" />
+          <div class="slug-preview" id="slug-preview">→ folder: your-skill/SKILL.md</div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="overview-input">Overview: the core objective in one sentence</label>
+          <input type="text" id="overview-input" placeholder="Locate air leaks in ductwork from a short audio recording." />
+        </div>
+        <div class="field">
+          <label class="field-label" for="desc-input">Description: what it does and when a model should activate it</label>
+          <textarea id="desc-input" rows="3" placeholder="One or two sentences. Trigger phrases are added from the next step."></textarea>
+        </div>
+        <div class="ai-row">
+          <button class="btn ai" id="ai-refine-identity" type="button">Refine with model</button>
+          <span class="ai-status" id="ai-status-1"></span>
+        </div>
+      </section>
+
+      <section class="step" data-step="2">
+        <h2>Wire the triggers</h2>
+        <p class="hint">Phrases and situations that should activate this skill. They land in the description and in the Trigger Scenarios section.</p>
+        <div class="trigger-row">
+          <input type="text" id="trigger-input" placeholder="e.g. find the duct leak" />
+          <button class="add-btn" id="add-trigger" type="button">Add</button>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div class="ai-row">
+          <button class="btn ai" id="ai-suggest-triggers" type="button">Suggest triggers</button>
+          <span class="ai-status" id="ai-status-2"></span>
+        </div>
+      </section>
+
+      <section class="step" data-step="3">
+        <h2>Write the execution steps</h2>
+        <p class="hint">One step per line, imperative voice ("Extract the dates"). Numbering is added for you. Rigid process: spell out each step. Creative task: state goals instead.</p>
+        <div class="field">
+          <label class="field-label" for="steps-input">Execution steps</label>
+          <textarea id="steps-input" placeholder="Analyze the input against the constraints&#10;Run the workflow&#10;Format the output as requested"></textarea>
+        </div>
+        <div class="ai-row">
+          <button class="btn ai" id="ai-draft-steps" type="button">Draft steps</button>
+          <span class="ai-status" id="ai-status-3"></span>
+        </div>
+      </section>
+
+      <section class="step" data-step="4">
+        <h2>Set the guardrails</h2>
+        <p class="hint">Checks and failure modes. One per line, e.g. required fields to validate, things to avoid, output limits.</p>
+        <div class="field">
+          <label class="field-label" for="guards-input">Guardrails &amp; gotchas</label>
+          <textarea id="guards-input" placeholder="Validate required fields before starting&#10;Keep output concise and actionable"></textarea>
+        </div>
+        <div class="ai-row">
+          <button class="btn ai" id="ai-draft-guards" type="button">Draft guardrails</button>
+          <span class="ai-status" id="ai-status-4"></span>
+        </div>
+      </section>
+
+      <section class="step" data-step="5">
+        <h2>Assemble and check portability</h2>
+        <p class="hint">Heuristic checks against the portable-skill rules. Fix warnings by hand or let the model rewrite the whole skill.</p>
+        <div class="ai-row">
+          <button class="btn ai" id="ai-polish-all" type="button">Polish and de-platform</button>
+          <span class="ai-status" id="ai-status-5"></span>
+        </div>
+        <ul class="lint" id="lint"></ul>
+      </section>
+
+      <div class="nav-buttons">
+        <button class="btn" id="back-btn" type="button">Back</button>
+        <button class="btn primary" id="next-btn" type="button">Continue</button>
+      </div>
+
+    </main>
+  </div>
+
+  <div class="manifest">
+    <div class="manifest-head">
+      <div class="manifest-path">→ <span id="manifest-path-text">your-skill/SKILL.md</span><em id="lint-summary"></em></div>
+      <div class="manifest-actions">
+        <button class="btn" id="copy-btn" type="button">Copy SKILL.md</button>
+        <button class="btn" id="copy-prompt-btn" type="button">Copy as plain prompt</button>
+        <button class="btn" id="download-btn" type="button">Download .md</button>
+      </div>
+    </div>
+    <div class="manifest-card">
+      <pre id="preview"><span class="placeholder">Name the skill in step 1 to start assembling.</span></pre>
+    </div>
+  </div>
+
+  <footer class="note">Model buttons call the engine chosen above and send your skill text to it. The key stays in this page's memory only. Nothing is stored; refreshing clears the form. Naming, triggers, linting and export work fully offline.</footer>
+
+</div>
+
+<script>
+(function(){
+  var state = { name: "", overview: "", description: "", triggers: [], steps: "", guards: "" };
+  var engine = { provider: "claude-inapp", baseUrl: "https://api.openai.com/v1", model: "", key: "" };
+  var step = 1;
+  var LAST = 5;
+
+  function $(id){ return document.getElementById(id); }
+
+  var nameInput = $("name-input"), overviewInput = $("overview-input"), descInput = $("desc-input");
+  var triggerInput = $("trigger-input"), addTriggerBtn = $("add-trigger"), chipsEl = $("chips");
+  var stepsInput = $("steps-input"), guardsInput = $("guards-input");
+  var slugPreview = $("slug-preview"), manifestPathText = $("manifest-path-text");
+  var preview = $("preview"), lintEl = $("lint"), lintSummary = $("lint-summary");
+  var backBtn = $("back-btn"), nextBtn = $("next-btn"), resetBtn = $("reset-btn");
+  var copyBtn = $("copy-btn"), copyPromptBtn = $("copy-prompt-btn"), downloadBtn = $("download-btn");
+  var steps = document.querySelectorAll(".step");
+  var railItems = document.querySelectorAll(".rail-item");
+
+  var aiBtns = {
+    refine: $("ai-refine-identity"), triggers: $("ai-suggest-triggers"),
+    steps: $("ai-draft-steps"), guards: $("ai-draft-guards"), polish: $("ai-polish-all")
+  };
+  var aiStatus = { refine: $("ai-status-1"), triggers: $("ai-status-2"), steps: $("ai-status-3"), guards: $("ai-status-4"), polish: $("ai-status-5") };
+
+  var providerSel = $("engine-provider"), baseInput = $("engine-base"), modelInput = $("engine-model"), keyInput = $("engine-key");
+  var baseWrap = $("engine-base-wrap"), modelWrap = $("engine-model-wrap"), keyWrap = $("engine-key-wrap");
+  var engineNote = $("engine-note"), engineSummary = $("engine-summary");
+
+  /* ---------- text helpers ---------- */
+  function slugify(str){
+    return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function titleCase(slug){
+    if(!slug) return "Your Skill";
+    return slug.split("-").filter(Boolean).map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(" ");
+  }
+  function escapeQuotes(str){ return str.replace(/"/g, '\\"'); }
+  function slug(){ return slugify(state.name); }
+  function toLines(str){
+    return str.split("\n").map(function(l){
+      return l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, "").trim();
+    }).filter(Boolean);
+  }
+  function oneLine(str){ return str.trim().replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " "); }
+
+  /* ---------- assembly ---------- */
+  function parts(){
+    var s = slug();
+    var desc = oneLine(state.description);
+    return {
+      slug: s,
+      title: titleCase(s),
+      desc: desc,
+      overview: oneLine(state.overview),
+      triggers: state.triggers.slice(),
+      steps: toLines(state.steps),
+      guards: toLines(state.guards)
+    };
+  }
+
+  function buildManifest(){
+    var p = parts();
+    if(!p.slug) return null;
+
+    var d = p.desc || "[add a description in step 1]";
+    if(p.triggers.length){
+      d += ' Trigger on: ' + p.triggers.map(function(t){ return '"' + escapeQuotes(t) + '"'; }).join(", ") + ".";
+    }
+
+    var out = "---\nname: " + p.slug + '\ndescription: "' + escapeQuotes(d) + '"\n---\n\n';
+    out += "# " + p.title + "\n\n";
+    out += "## Overview\n" + (p.overview || "[add a one-sentence overview in step 1]") + "\n\n";
+    out += "## Trigger Scenarios\n";
+    out += p.triggers.length ? p.triggers.map(function(t){ return "- " + t; }).join("\n") : "- [add trigger scenarios in step 2]";
+    out += "\n\n## Execution Steps\n";
+    out += p.steps.length ? p.steps.map(function(t, i){ return (i + 1) + ". " + t; }).join("\n") : "1. [add execution steps in step 3]";
+    out += "\n\n## Guardrails & Gotchas\n";
+    out += p.guards.length ? p.guards.map(function(t){ return "- " + t; }).join("\n") : "- [add guardrails in step 4]";
+    return out + "\n";
+  }
+
+  function buildPlainPrompt(){
+    var p = parts();
+    if(!p.slug) return null;
+    var out = "# " + p.title + "\n\n";
+    if(p.desc) out += p.desc + "\n\n";
+    out += "## Objective\n" + (p.overview || "[add an overview]") + "\n\n";
+    if(p.triggers.length) out += "## Use this when\n" + p.triggers.map(function(t){ return "- " + t; }).join("\n") + "\n\n";
+    out += "## Steps\n" + (p.steps.length ? p.steps.map(function(t, i){ return (i + 1) + ". " + t; }).join("\n") : "1. [add steps]") + "\n\n";
+    out += "## Constraints\n" + (p.guards.length ? p.guards.map(function(t){ return "- " + t; }).join("\n") : "- [add guardrails]") + "\n";
+    return out;
+  }
+
+  /* ---------- portability lint (heuristic, no model needed) ---------- */
+  var VENDOR_RE = /\b(claude|anthropic|chatgpt|gpt-?\d*|openai|gemini|llama|deepseek|copilot|mistral)\b/gi;
+  var TOOL_RE = /(bash_tool|create_file|present_files|str_replace|\/mnt\/[\w\/.-]*|\bMCP\b|tool_use|function[ _]call(?:ing)?|web_search|\bartifacts?\b)/gi;
+
+  function uniqueMatches(re, text){
+    var seen = {}, out = [], m;
+    re.lastIndex = 0;
+    while((m = re.exec(text)) !== null){
+      var k = m[0].toLowerCase();
+      if(!seen[k]){ seen[k] = true; out.push(m[0]); }
+    }
+    return out;
+  }
+
+  function lint(){
+    var manifest = buildManifest();
+    if(!manifest) return [];
+    var p = parts();
+    var res = [];
+
+    var lines = manifest.replace(/\s+$/, "").split("\n").length;
+    res.push(lines <= 500
+      ? { level: "ok", msg: lines + " of 500 lines. Fits any model's attention window." }
+      : { level: "bad", msg: lines + " lines. Cut below 500." });
+
+    res.push(/^[a-z0-9]+(-[a-z0-9]+)*$/.test(p.slug)
+      ? { level: "ok", msg: "Frontmatter name is a clean slug." }
+      : { level: "bad", msg: "Name is not a lowercase-hyphenated slug." });
+
+    res.push(p.desc
+      ? { level: "ok", msg: "Description present." }
+      : { level: "warn", msg: "No description. Routers match on it." });
+
+    if(p.triggers.length >= 2) res.push({ level: "ok", msg: p.triggers.length + " trigger phrases in the description." });
+    else res.push({ level: "warn", msg: "Add at least two trigger phrases so routers can match this skill." });
+
+    if(!p.overview) res.push({ level: "warn", msg: "Overview is empty." });
+    if(!p.steps.length) res.push({ level: "warn", msg: "No execution steps." });
+    if(!p.guards.length) res.push({ level: "warn", msg: "No guardrails." });
+
+    var vendors = uniqueMatches(VENDOR_RE, manifest);
+    var tools = uniqueMatches(TOOL_RE, manifest);
+    var plat = vendors.concat(tools);
+    res.push(plat.length
+      ? { level: "warn", msg: "Platform-specific terms: " + plat.join(", ") + ". Rewrite or drop them." }
+      : { level: "ok", msg: "No vendor or tool-specific references." });
+
+    var passive = p.steps.filter(function(s){
+      return /^(the|a|an|it|there|this)\b/i.test(s) || /\b(should be|must be|will be|is to be|are to be)\b/i.test(s);
+    });
+    res.push(passive.length
+      ? { level: "warn", msg: passive.length + " step(s) not in imperative voice (heuristic). Start each with a verb." }
+      : { level: "ok", msg: "Steps read as imperatives (heuristic)." });
+
+    if(/\[(add|write)[^\]]*\]/i.test(manifest)) res.push({ level: "warn", msg: "Unfilled placeholders in the file." });
+
+    return res;
+  }
+
+  function renderLint(){
+    var res = lint();
+    lintEl.innerHTML = "";
+    var warns = 0;
+    res.forEach(function(r){
+      if(r.level !== "ok") warns++;
+      var li = document.createElement("li");
+      li.className = r.level;
+      var mark = document.createElement("span");
+      mark.className = "mark";
+      mark.textContent = r.level === "ok" ? "\u2713" : (r.level === "warn" ? "!" : "\u2715");
+      var txt = document.createElement("span");
+      txt.textContent = r.msg;
+      li.appendChild(mark);
+      li.appendChild(txt);
+      lintEl.appendChild(li);
+    });
+    if(!res.length){ lintSummary.textContent = ""; return; }
+    var manifest = buildManifest();
+    var lines = manifest.replace(/\s+$/, "").split("\n").length;
+    lintSummary.textContent = lines + " lines \u00b7 " + (warns ? warns + " to fix" : "clean");
+  }
+
+  /* ---------- render ---------- */
+  function updatePreview(){
+    var manifest = buildManifest();
+    if(!manifest){
+      preview.innerHTML = '<span class="placeholder">Name the skill in step 1 to start assembling.</span>';
+      copyBtn.disabled = copyPromptBtn.disabled = downloadBtn.disabled = true;
+    } else {
+      preview.textContent = manifest;
+      copyBtn.disabled = copyPromptBtn.disabled = downloadBtn.disabled = false;
+    }
+    renderLint();
+  }
+
+  function render(){
+    railItems.forEach(function(item){
+      var n = parseInt(item.getAttribute("data-step"), 10);
+      item.classList.toggle("is-active", n === step);
+      item.classList.toggle("is-done", n < step);
+    });
+    steps.forEach(function(sec){
+      sec.classList.toggle("is-active", parseInt(sec.getAttribute("data-step"), 10) === step);
+    });
+    backBtn.disabled = step === 1;
+    nextBtn.textContent = step === LAST ? "Done" : "Continue";
+    nextBtn.disabled = step === LAST;
+
+    var s = slug();
+    var pathText = (s || "your-skill") + "/SKILL.md";
+    slugPreview.textContent = "\u2192 folder: " + pathText;
+    manifestPathText.textContent = pathText;
+    updatePreview();
+  }
+
+  function renderChips(){
+    if(!state.triggers.length){
+      chipsEl.innerHTML = '<span class="empty-note">No triggers yet. Add a few phrases above.</span>';
+      return;
+    }
+    chipsEl.innerHTML = "";
+    state.triggers.forEach(function(t, i){
+      var chip = document.createElement("span");
+      chip.className = "chip";
+      var label = document.createElement("span");
+      label.textContent = t;
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.textContent = "\u00d7";
+      rm.setAttribute("aria-label", "Remove trigger: " + t);
+      rm.addEventListener("click", function(){ state.triggers.splice(i, 1); renderChips(); updatePreview(); });
+      chip.appendChild(label);
+      chip.appendChild(rm);
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  function addTrigger(){
+    var val = triggerInput.value.trim();
+    if(!val) return;
+    if(state.triggers.indexOf(val) === -1) state.triggers.push(val);
+    triggerInput.value = "";
+    renderChips();
+    updatePreview();
+    triggerInput.focus();
+  }
+
+  function goStep(n){
+    if(n > step && step === 1 && !state.name.trim()){
+      nameInput.focus();
+      nameInput.style.outlineColor = "var(--danger)";
+      setTimeout(function(){ nameInput.style.outlineColor = ""; }, 900);
+      return;
+    }
+    step = Math.min(LAST, Math.max(1, n));
+    render();
+  }
+
+  function flashLabel(btn, text){
+    var original = btn.textContent;
+    btn.textContent = text;
+    setTimeout(function(){ btn.textContent = original; }, 1400);
+  }
+
+  function fallbackCopy(text){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch(e) {}
+    document.body.removeChild(ta);
+  }
+
+  function copyText(btn, text){
+    if(!text) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ flashLabel(btn, "Copied \u2713"); }, function(){
+        fallbackCopy(text); flashLabel(btn, "Copied \u2713");
+      });
+    } else {
+      fallbackCopy(text); flashLabel(btn, "Copied \u2713");
+    }
+  }
+
+  /* ---------- engine: any model, not one vendor ---------- */
+  var NOTES = {
+    "claude-inapp": "Uses the model built into Claude. Works only while this page is open inside Claude.",
+    "openai": "Any OpenAI-compatible server: OpenAI, OpenRouter, DeepSeek, or local Ollama (http://localhost:11434/v1) and LM Studio (http://localhost:1234/v1). Local servers need CORS enabled and work when this file is opened from disk.",
+    "anthropic": "Direct Anthropic API call from the browser with your key. May be blocked inside Claude's preview; works when the file is opened from disk.",
+    "off": "Model buttons disabled. Everything else works offline."
+  };
+  var LABELS = { "claude-inapp": "Claude (in-app)", "openai": "OpenAI-compatible", "anthropic": "Anthropic API", "off": "Off" };
+
+  function syncEngineUI(){
+    engine.provider = providerSel.value;
+    engine.baseUrl = baseInput.value.trim();
+    engine.model = modelInput.value.trim();
+    engine.key = keyInput.value;
+    baseWrap.hidden = engine.provider !== "openai";
+    modelWrap.hidden = !(engine.provider === "openai" || engine.provider === "anthropic");
+    keyWrap.hidden = modelWrap.hidden;
+    engineNote.textContent = NOTES[engine.provider];
+    engineSummary.textContent = LABELS[engine.provider];
+    Object.keys(aiBtns).forEach(function(k){ aiBtns[k].disabled = engine.provider === "off"; });
+  }
+
+  function callModel(prompt){
+    var p = engine.provider;
+
+    if(p === "claude-inapp"){
+      return fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1400, messages: [{ role: "user", content: prompt }] })
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(!d || !d.content || !d.content.length) throw new Error("empty response");
+        return d.content.filter(function(b){ return b.type === "text"; }).map(function(b){ return b.text; }).join("\n");
+      });
+    }
+
+    if(p === "openai"){
+      if(!engine.model) return Promise.reject(new Error("set a model id in Engine settings"));
+      var headers = { "Content-Type": "application/json" };
+      if(engine.key) headers["Authorization"] = "Bearer " + engine.key;
+      return fetch(engine.baseUrl.replace(/\/+$/, "") + "/chat/completions", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ model: engine.model, temperature: 0.4, messages: [{ role: "user", content: prompt }] })
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(d && d.error) throw new Error(d.error.message || "endpoint returned an error");
+        var c = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+        if(!c) throw new Error("empty response");
+        return c;
+      });
+    }
+
+    if(p === "anthropic"){
+      if(!engine.model || !engine.key) return Promise.reject(new Error("set a model id and key in Engine settings"));
+      return fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": engine.key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
+        body: JSON.stringify({ model: engine.model, max_tokens: 1400, messages: [{ role: "user", content: prompt }] })
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(d && d.error) throw new Error(d.error.message || "API returned an error");
+        if(!d || !d.content || !d.content.length) throw new Error("empty response");
+        return d.content.filter(function(b){ return b.type === "text"; }).map(function(b){ return b.text; }).join("\n");
+      });
+    }
+
+    return Promise.reject(new Error("engine is off"));
+  }
+
+  // Local and small models wrap JSON in chatter. Take the outermost {...} or [...].
+  function extractJson(text){
+    var t = text.replace(/```json/gi, "").replace(/```/g, "");
+    var o = t.indexOf("{"), a = t.indexOf("[");
+    var start = (o === -1) ? a : (a === -1 ? o : Math.min(o, a));
+    if(start === -1) throw new Error("no json");
+    var close = t.charAt(start) === "{" ? "}" : "]";
+    var end = t.lastIndexOf(close);
+    if(end <= start) throw new Error("no json");
+    return JSON.parse(t.slice(start, end + 1));
+  }
+
+  function setBusy(key, isBusy, label){
+    aiBtns[key].disabled = isBusy || engine.provider === "off";
+    aiBtns[key].classList.toggle("is-busy", isBusy);
+    if(isBusy) aiStatus[key].textContent = label || "Thinking\u2026";
+  }
+
+  function shortErr(err){
+    var m = (err && err.message) ? err.message : "unknown error";
+    if(/failed to fetch|networkerror|load failed/i.test(m)) m = "network or CORS blocked. Check the engine URL and that the server allows this page.";
+    return "Model call failed: " + m.slice(0, 110);
+  }
+
+  function runAI(key, prompt, onDone, busyLabel){
+    if(engine.provider === "off"){ aiStatus[key].textContent = "Engine is off. Pick one in Engine settings."; return; }
+    setBusy(key, true, busyLabel);
+    callModel(prompt).then(function(text){
+      setBusy(key, false);
+      try { onDone(text); }
+      catch(e){ aiStatus[key].textContent = "Got a reply but couldn't read it. Try again, or use a stronger model."; }
+    }, function(err){
+      setBusy(key, false);
+      aiStatus[key].textContent = shortErr(err);
+    });
+  }
+
+  var RULES = "Write for any language model, not one vendor: imperative voice, plain text, no tool names, no product or vendor names, no file paths.";
+
+  function ctx(){
+    return "Name: " + (state.name || "(none)") +
+      "\nOverview: " + (state.overview || "(none)") +
+      "\nDescription: " + (state.description || "(none)") +
+      "\nTrigger phrases: " + (state.triggers.join("; ") || "(none)");
+  }
+
+  /* ---------- the four model actions + polish ---------- */
+  aiBtns.refine.addEventListener("click", function(){
+    var prompt = "You are helping define a portable AI skill: a SKILL.md any language model can follow. " + RULES +
+      " Return ONLY a JSON object with fields \"name\" (lowercase-hyphenated slug, 2-4 words), \"overview\" (one sentence stating the core objective) and \"description\" (one or two sentences: what the skill does and when to activate it; do NOT list trigger phrases, they are added separately). No code fences, no commentary. If every input below is empty, return {\"error\":\"give me a rough name, overview or description to work from\"}.\n\nRough name: " +
+      (state.name || "(none)") + "\nRough overview: " + (state.overview || "(none)") + "\nRough description: " + (state.description || "(none)");
+    runAI("refine", prompt, function(text){
+      var r = extractJson(text);
+      if(r.error){ aiStatus.refine.textContent = r.error; return; }
+      if(r.name){ state.name = slugify(r.name); nameInput.value = state.name; }
+      if(r.overview){ state.overview = r.overview; overviewInput.value = r.overview; }
+      if(r.description){ state.description = r.description; descInput.value = r.description; }
+      render();
+      aiStatus.refine.textContent = "Refined \u2713";
+    }, "Refining\u2026");
+  });
+
+  aiBtns.triggers.addEventListener("click", function(){
+    var prompt = "Suggest 5 short trigger phrases for this portable AI skill: words or situations a person might say that should make a model activate it. Return ONLY a JSON array of strings. No code fences, no commentary. Do not repeat existing triggers.\n\n" + ctx();
+    runAI("triggers", prompt, function(text){
+      var arr = extractJson(text);
+      if(!Array.isArray(arr)) throw new Error("not an array");
+      var added = 0;
+      arr.forEach(function(t){
+        if(typeof t === "string" && t.trim() && state.triggers.indexOf(t.trim()) === -1){ state.triggers.push(t.trim()); added++; }
+      });
+      renderChips();
+      updatePreview();
+      aiStatus.triggers.textContent = added ? ("Added " + added + " \u2713") : "Nothing new";
+    }, "Thinking\u2026");
+  });
+
+  aiBtns.steps.addEventListener("click", function(){
+    var prompt = "Draft the Execution Steps for this portable AI skill. " + RULES +
+      " Return ONLY a JSON array of 4 to 8 strings. Each string is one concrete step in order, starting with a verb. No numbering, no code fences, no commentary. If existing notes are given, keep their intent and improve them.\n\n" + ctx() + "\nExisting notes:\n" + (state.steps || "(none)");
+    runAI("steps", prompt, function(text){
+      var arr = extractJson(text);
+      if(!Array.isArray(arr)) throw new Error("not an array");
+      state.steps = arr.map(String).join("\n");
+      stepsInput.value = state.steps;
+      updatePreview();
+      aiStatus.steps.textContent = "Drafted \u2713";
+    }, "Drafting\u2026");
+  });
+
+  aiBtns.guards.addEventListener("click", function(){
+    var prompt = "Draft the Guardrails & Gotchas for this portable AI skill: validation checks, things to avoid, common failure modes, output limits. " + RULES +
+      " Return ONLY a JSON array of 3 to 6 strings, each specific and imperative. No code fences, no commentary. If existing notes are given, keep their intent and improve them.\n\n" + ctx() + "\nExecution steps:\n" + (state.steps || "(none)") + "\nExisting notes:\n" + (state.guards || "(none)");
+    runAI("guards", prompt, function(text){
+      var arr = extractJson(text);
+      if(!Array.isArray(arr)) throw new Error("not an array");
+      state.guards = arr.map(String).join("\n");
+      guardsInput.value = state.guards;
+      updatePreview();
+      aiStatus.guards.textContent = "Drafted \u2713";
+    }, "Drafting\u2026");
+  });
+
+  aiBtns.polish.addEventListener("click", function(){
+    var issues = lint().filter(function(r){ return r.level !== "ok"; }).map(function(r){ return "- " + r.msg; }).join("\n") || "- none";
+    var prompt = "Rewrite this portable AI skill so any language model can follow it. " + RULES +
+      " Keep the substance and all specifics. Fix these portability findings:\n" + issues +
+      "\n\nReturn ONLY a JSON object with fields \"name\" (slug), \"overview\" (one sentence), \"description\" (one or two sentences, no trigger list), \"triggers\" (array of strings), \"steps\" (array of imperative strings, no numbering), \"guardrails\" (array of strings). No code fences, no commentary.\n\n" +
+      ctx() + "\nExecution steps:\n" + (state.steps || "(none)") + "\nGuardrails:\n" + (state.guards || "(none)");
+    runAI("polish", prompt, function(text){
+      var r = extractJson(text);
+      if(r.name){ state.name = slugify(r.name); nameInput.value = state.name; }
+      if(r.overview){ state.overview = r.overview; overviewInput.value = r.overview; }
+      if(r.description){ state.description = r.description; descInput.value = r.description; }
+      if(Array.isArray(r.triggers)){ state.triggers = r.triggers.map(String); renderChips(); }
+      if(Array.isArray(r.steps)){ state.steps = r.steps.map(String).join("\n"); stepsInput.value = state.steps; }
+      if(Array.isArray(r.guardrails)){ state.guards = r.guardrails.map(String).join("\n"); guardsInput.value = state.guards; }
+      render();
+      aiStatus.polish.textContent = "Rewritten \u2713";
+    }, "Rewriting\u2026");
+  });
+
+  /* ---------- events ---------- */
+  nameInput.addEventListener("input", function(){ state.name = nameInput.value; render(); });
+  overviewInput.addEventListener("input", function(){ state.overview = overviewInput.value; updatePreview(); });
+  descInput.addEventListener("input", function(){ state.description = descInput.value; updatePreview(); });
+  stepsInput.addEventListener("input", function(){ state.steps = stepsInput.value; updatePreview(); });
+  guardsInput.addEventListener("input", function(){ state.guards = guardsInput.value; updatePreview(); });
+
+  triggerInput.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); addTrigger(); } });
+  addTriggerBtn.addEventListener("click", addTrigger);
+
+  backBtn.addEventListener("click", function(){ goStep(step - 1); });
+  nextBtn.addEventListener("click", function(){ if(step < LAST) goStep(step + 1); });
+  railItems.forEach(function(item){
+    item.addEventListener("click", function(){ goStep(parseInt(item.getAttribute("data-step"), 10)); });
+  });
+
+  providerSel.addEventListener("change", syncEngineUI);
+  baseInput.addEventListener("input", syncEngineUI);
+  modelInput.addEventListener("input", syncEngineUI);
+  keyInput.addEventListener("input", syncEngineUI);
+
+  copyBtn.addEventListener("click", function(){ copyText(copyBtn, buildManifest()); });
+  copyPromptBtn.addEventListener("click", function(){ copyText(copyPromptBtn, buildPlainPrompt()); });
+
+  downloadBtn.addEventListener("click", function(){
+    var manifest = buildManifest();
+    if(!manifest) return;
+    var blob = new Blob([manifest], { type: "text/markdown" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = (slug() || "skill") + "-SKILL.md";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    flashLabel(downloadBtn, "Downloaded \u2713");
+  });
+
+  resetBtn.addEventListener("click", function(){
+    if(!confirm("Clear everything and start over?")) return;
+    state = { name: "", overview: "", description: "", triggers: [], steps: "", guards: "" };
+    nameInput.value = overviewInput.value = descInput.value = triggerInput.value = stepsInput.value = guardsInput.value = "";
+    Object.keys(aiStatus).forEach(function(k){ aiStatus[k].textContent = ""; });
+    step = 1;
+    renderChips();
+    render();
+  });
+
+  syncEngineUI();
+  renderChips();
+  render();
+})();
+</script>
+
+</body>
+</html>
